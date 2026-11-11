@@ -15,9 +15,10 @@ import scipy.linalg
 import random
 import pandas as pd
 
-def plot_ellipse(S, b, ax):
-    lambda_var = 9.80665
-    eigvals, eigvecs = np.linalg.eigh(lambda_var*S)
+def plot_ellipse(Q, b, ax):
+    S = scipy.linalg.sqrtm(np.linalg.inv(Q))
+    
+    eigvals, eigvecs = np.linalg.eigh(S)
     aa, bb = eigvals
 
     theta = np.linspace(0, 2 * np.pi, 100)
@@ -59,10 +60,12 @@ def fit_ellipse_subset(points):
     x = points[:, 0]
     y = points[:, 1]
 
-    ## Then build the matrix, same way I did in Question1  
+    ## Then build the matrix, same way I did in Question 1  
 
     M = np.column_stack((x**2, 2*x*y, y**2, -2*x, -2*y))
     X = np.array([-1, -1, -1, -1, -1]) 
+
+    ## solve the linear system of equations to get the coefficients A, B, C, D, E
     A, B, C, D, E = np.linalg.solve(M,X)
 
     # Convert the polynomial coefficients to Q and b.
@@ -79,13 +82,13 @@ def fit_ellipse_subset(points):
 def ransac_ellipse(data, num_iterations=1000, threshold=0.2):
     inliers = []
 
-    # Given the data sets, perform RANSAC to find the best Q and b as well as the inliers
-    # Hint: You should use fit_ellipse_subset 
-    # Hint: in some case, the Q matrix might not be positive defintie, use is_positive_definite to check.
-
     ##### ADD your code here : #####
     Q = None
-    b = None 
+    b = None
+
+    data_min = data.min(axis=0)
+    data_max = data.max(axis=0)
+
     for i in range(num_iterations):
         # Randomly select 5 points from the dataset
         random_indices = np.random.choice(data.shape[0], 5, replace=False)
@@ -94,14 +97,19 @@ def ransac_ellipse(data, num_iterations=1000, threshold=0.2):
         # Fit an ellipse to the subset of points
         Test_Q, Test_b = fit_ellipse_subset(subset)
 
-        # Check if Q is positive definite as mentioned in the hint
+        ## Check if Q is positive definite as mentioned in the hint 
         if not is_positive_definite(Test_Q):
             continue
 
-        # Have to apply the inlier check from the assignment instructions to find the inliers
+        ## Check if the center of the ellipse is within the bounds of the data
+        ## I added this to avoid huge ellipses that are not relevant to the data
+        if np.any(Test_b < data_min) or np.any(Test_b > data_max):
+            continue
+
+        # Apply the assignment's inlier check
         residuals = []
 
-        # Will calculate the residual for each point in the dataset and check if it is less than the threshold
+        ## Looped through the data, you can also use whole dataset to speed this up but I kept it simple for clarity
         for point in data:
             offset = point - Test_b
             quadratic_value = offset.T @ Test_Q @ offset
@@ -111,17 +119,16 @@ def ransac_ellipse(data, num_iterations=1000, threshold=0.2):
         residuals = np.array(residuals)
         Test_inliers = data[residuals <= threshold]
 
-        ## update all parameters if the number of inliers is greater than the previous best
-        if Q is None or len(Test_inliers) > len(inliers):
+        # Update if these test values have more inliers
+        if len(Test_inliers) > len(inliers):
             Q = Test_Q
             b = Test_b
             inliers = Test_inliers
 
     ##### END #####
-    return Q,b,inliers
+    return Q, b, inliers
 
 if __name__ == "__main__":
-    # Load the data from CSV file and select N random points
     N = 500
     all_data = pd.read_csv('data_x_y.csv').to_numpy()
     dataset = all_data[np.random.choice(all_data.shape[0], N, replace=False), :]
@@ -134,5 +141,4 @@ if __name__ == "__main__":
     visualize_data(dataset, ax1, inliers, threshold=0.5)
     plot_ellipse(Q, b_est, ax1)
     ax1.set_title("RANSAC Ellipse Fitting with Threshold Visualization")
-
     plt.show()
