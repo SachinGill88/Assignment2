@@ -79,7 +79,7 @@ def fit_ellipse_subset(points):
     ##### END #####
     return Q, b
 
-def ransac_ellipse(data, num_iterations=1000, threshold=0.2):
+def ransac_ellipse(data, num_iterations=1000, threshold=0.5):
     inliers = []
 
     ##### ADD your code here : #####
@@ -101,7 +101,6 @@ def ransac_ellipse(data, num_iterations=1000, threshold=0.2):
         if not is_positive_definite(Test_Q):
             continue
 
-        ## Check if the center of the ellipse is within the bounds of the data
         ## I added this to avoid huge ellipses that are not relevant to the data
         if np.any(Test_b < data_min) or np.any(Test_b > data_max):
             continue
@@ -135,10 +134,15 @@ if __name__ == "__main__":
     # dataset is p
     
     Q, b_est, inliers = ransac_ellipse(dataset)
+
+    ## Couple of parameters to help with the comparison (part C)
+    print (len(inliers)/len(dataset)) ## % inliers
+    print (b_est[0], b_est[1]) ## estimated center of the ellipse
+
     
     # Plot the raw measurements and fitted ellipse
     fig, ax1 = plt.subplots(1, 1, figsize=(16, 8))
-    visualize_data(dataset, ax1, inliers, threshold=0.5)
+    visualize_data(dataset, ax1, inliers, threshold=0.2)
     plot_ellipse(Q, b_est, ax1)
     ax1.set_title("RANSAC Ellipse Fitting with Threshold Visualization")
     plt.show()
